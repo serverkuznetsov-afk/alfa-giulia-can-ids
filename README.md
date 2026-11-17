@@ -53,6 +53,8 @@ tested it on my car above. **Corrections and new finds are welcome.** Open an is
 | 0x41B | **Throttle plate** | b4-b5, 16 bits | raw x 0.03754 + 10.58 | % | LIKELY |
 | 0x384 | Outside temp | b1-b2, 9 bits >> 1 | raw - 142 | °F | CONFIRMED |
 | 0x0FA | Brake pedal | b0 bits 3-2 | 0 = released, 3 = pressed (b0 0x80 / 0x8C) | | CONFIRMED |
+| 0x107 | **Brake pressure** | b0 | raw (0 foot off, 60-70 holding the car still, ~45-52 in a firm stop) | bar? | GUESS |
+| 0x1FA | Brake pedal travel? | b0 | raw - 16 (16 released, ~36 pressed) | raw | GUESS |
 | 0x256 | Parking brake (EPB) | b0 bit 3 | 1 = applied (b0 0x28 on, 0x20 off) | | LIKELY |
 | 0x73E | **Left turn signal** | b1 bit 7 | 1 = lamp on (blinks) | | LIKELY |
 | 0x73E | **Right turn signal** | b2 bit 5 | 1 = lamp on (blinks) | | LIKELY |
@@ -94,6 +96,7 @@ only while driving, yaw rate or lateral acceleration candidate), 0x419 / 0x41A (
 events), 0x192 (b3-b4 count while cluster warnings are on), 0x1EF.
 
 Battery voltage (OBD PID 0x42, 13.8-14.4 V on the drive) has no broadcast match yet.
+0x0FE b0-b1 (12 bits >> 4, centered on 2048) follows deceleration while braking and barely moves when parked with the brake held: probably a longitudinal acceleration sensor.
 
 ## Asking the engine computer (UDS / OBD-II)
 

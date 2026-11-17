@@ -23,10 +23,12 @@ ID     Message                   Signal                                Unit   Co
 0x100  Wheel speeds?             (nothing decoded yet)
 0x101  Vehicle speed             Vehicle speed                         mph    CONFIRMED
                                  Speedometer (as on dash)              mph    LIKELY
+0x107  Brake pressure            Brake pressure                        bar    GUESS
 0x192  Warnings / faults         (nothing decoded yet)
 0x1EF  Unknown 1EF               (nothing decoded yet)
 0x1F7  Transmission 2            Gearbox input (turbine) speed         rpm    LIKELY
                                  Transmission fluid temp?              C      GUESS
+0x1FA  Brake pedal travel?       Brake pedal travel?                   raw    GUESS
 0x256  Parking brake (EPB)       Parking brake                                LIKELY
 0x2ED  Engine temps / load       Coolant temp                          C      CONFIRMED
                                  Engine load (2ED)                     %      LIKELY
@@ -107,6 +109,14 @@ DETAILS
       note:    Same field x1.025 + 0.3 mph: an earlier cluster calibration. Matches the SPEED
       xx MPH markers within ~1 mph.
 
+0x107  Brake pressure   (every 20 ms, counter byte 6, CRC byte 7)
+  - Brake pressure  [GUESS]
+      where:   byte 0, 8 bits
+      value:   raw bar
+      note:    0 with the foot off, 60-70 holding the car still, up to ~52 during a firm stop
+      on the 2026-11-17 drive. Behaves like master-cylinder pressure; 'bar' is assumed, not
+      proven.
+
 0x192  Warnings / faults   (every 100 ms)
     b3-b4 count up while cluster warnings are active.
 
@@ -123,6 +133,13 @@ DETAILS
       value:   raw C
       note:    BACCAble formula ((b2&1)<<5 | b3>>3). Only moves 28->33 while coolant goes
       64->100, so the scale/offset is probably wrong.
+
+0x1FA  Brake pedal travel?   (every 20 ms)
+  - Brake pedal travel?  [GUESS]
+      where:   byte 0, 8 bits
+      value:   raw - 16
+      note:    b0 rests at 16 with the pedal released and goes to ~36 when pressed (offset
+      removed). b1 top bits are a 2-bit counter.
 
 0x256  Parking brake (EPB)   (every 1000 ms)
   - Parking brake  [LIKELY]

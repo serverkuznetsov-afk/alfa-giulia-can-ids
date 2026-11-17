@@ -25,7 +25,15 @@
       0.667
     ],
     "gear_k": 41.6,
-    "gear_note": "ZF 8HP. Only used when no 'gear' signal is decoded. Measured RPM/mph in 3rd..8th: 89, 72, 55, 42, 34, 27 (captures/old_firmware)."
+    "gear_note": "ZF 8HP. Only used when no 'gear' signal is decoded. Measured RPM/mph in 3rd..8th: 89, 72, 55, 42, 34, 27 (captures/old_firmware).",
+    "boost_max_psi": 30,
+    "pedal": {
+      "released": 20,
+      "floored": 84,
+      "kickdown": 88,
+      "note": "Pedal sensor % (0x412 b3) at rest / floored / pushed through the kickdown switch, from the 2026-11-17 drive"
+    },
+    "brake_full_bar": 80
   },
   "modules": {
     "18DA40F1": "Body computer (BCM)? - most network / body codes land here",
@@ -365,7 +373,8 @@
             "1": "?",
             "2": "?"
           },
-          "note": "b0 0x80 = released, 0x8C = pressed (BRAKE ON marker). b0 bit 7 drops to 0 (0x20) when the car is off."
+          "note": "b0 0x80 = released, 0x8C = pressed (BRAKE ON marker). b0 bit 7 drops to 0 (0x20) when the car is off.",
+          "role": "brake"
         }
       ]
     },
@@ -642,7 +651,8 @@
             "0": "off",
             "1": "on"
           },
-          "note": "Blinks with the left signal. It blinked twice as fast (0.17 s) because the front-left bulb was out - bulb-out hyper-flash."
+          "note": "Blinks with the left signal. It blinked twice as fast (0.17 s) because the front-left bulb was out - bulb-out hyper-flash.",
+          "role": "turn_left"
         },
         {
           "name": "Right turn signal",
@@ -659,7 +669,53 @@
             "0": "off",
             "1": "on"
           },
-          "note": "Blinks with the right signal (0.34 s, normal rate)."
+          "note": "Blinks with the right signal (0.34 s, normal rate).",
+          "role": "turn_right"
+        }
+      ]
+    },
+    {
+      "id": "107",
+      "name": "Brake pressure",
+      "period_ms": 20,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Brake pressure",
+          "role": "brake_pressure",
+          "byte": 0,
+          "bits": 8,
+          "shift": 0,
+          "scale": 1,
+          "offset": 0,
+          "unit": "bar",
+          "min": 0,
+          "max": 120,
+          "confidence": "guess",
+          "note": "0 with the foot off, 60-70 holding the car still, up to ~52 during a firm stop on the 2026-11-17 drive. Behaves like master-cylinder pressure; 'bar' is assumed, not proven."
+        }
+      ]
+    },
+    {
+      "id": "1FA",
+      "name": "Brake pedal travel?",
+      "period_ms": 20,
+      "signals": [
+        {
+          "name": "Brake pedal travel?",
+          "byte": 0,
+          "bits": 8,
+          "shift": 0,
+          "scale": 1,
+          "offset": -16,
+          "unit": "raw",
+          "min": 0,
+          "max": 30,
+          "confidence": "guess",
+          "note": "b0 rests at 16 with the pedal released and goes to ~36 when pressed (offset removed). b1 top bits are a 2-bit counter."
         }
       ]
     }
