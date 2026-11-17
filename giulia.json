@@ -1,0 +1,540 @@
+{
+  "vehicle": "Alfa Romeo Giulia (2017, 2.0T Q4, ZF 8HP)",
+  "vin_prefix": "ZAR",
+  "bus": "OBD-II pins 6/14, 500 kbit/s, 11-bit + 29-bit ids",
+  "updated": "2026-11-16",
+  "notes": [
+    "Signal extraction: take `bits` bits from the big-endian integer starting at `byte`, after shifting right by `shift`.",
+    "value = raw * scale + offset. confidence: confirmed | likely | guess. `values` maps a raw value to a label (states, gears).",
+    "Most 10/20 ms messages end with: byte[-2] low nibble = rolling counter (0-15), byte[-1] = CRC-8 SAE J1850 (poly 0x1D, init 0xFF, xorout 0xFF) of all previous bytes.",
+    "Every signal was checked against the recordings in captures/ and the markers written while recording (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values across several sessions."
+  ],
+  "cluster": {
+    "rpm_max": 7000,
+    "redline": 5500,
+    "speed_max": 160,
+    "gear_ratios": [
+      4.714,
+      3.143,
+      2.106,
+      1.667,
+      1.285,
+      1.0,
+      0.839,
+      0.667
+    ],
+    "gear_k": 41.6,
+    "gear_note": "ZF 8HP. Only used when no 'gear' signal is decoded. Measured RPM/mph in 3rd..8th: 89, 72, 55, 42, 34, 27 (captures/old_firmware)."
+  },
+  "modules": {
+    "18DA40F1": "Body computer (BCM)? - most network / body codes land here",
+    "18DA60F1": "Instrument cluster (IPC)?"
+  },
+  "dtc_descriptions": {},
+  "rejected": [
+    "0FA b4 as speed (body counter, ~6 mph error) - use 101",
+    "100 b2-b3 as speed or coolant (wheel dynamics ticks)",
+    "1F7 b5 as coolant, 104 b7 / 0FA b5 as oil temp, 0FB b1 / 192 as outside temp",
+    "0FC b0 high nibble as engaged gear while moving (RPM mux) - use 2EF",
+    "0DE b4 as throttle (rolling 0-15 counter)",
+    "0FB b3 x0.1 as boost psi (22 psi with engine off; low nibble always 4/C, so not a byte-aligned signal)"
+  ],
+  "messages": [
+    {
+      "id": "0FC",
+      "name": "Engine",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Engine RPM",
+          "role": "rpm",
+          "byte": 0,
+          "bits": 14,
+          "shift": 2,
+          "scale": 1,
+          "offset": 0,
+          "unit": "rpm",
+          "min": 0,
+          "max": 7000,
+          "gauge": true,
+          "confidence": "confirmed",
+          "note": "(b0*256 + (b1&0xFC))/4. Matches the RPM 1000/2000/3000 markers in manual_drive. ~800 idle."
+        }
+      ]
+    },
+    {
+      "id": "101",
+      "name": "Vehicle speed",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Vehicle speed",
+          "role": "speed",
+          "byte": 0,
+          "bits": 13,
+          "shift": 5,
+          "scale": 0.0388357,
+          "offset": 0,
+          "unit": "mph",
+          "min": 0,
+          "max": 140,
+          "gauge": true,
+          "confidence": "confirmed",
+          "note": "13-bit km/h x16 (b0 bits 1-0, b1, b2 bits 7-5). True speed: the cluster shows ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16."
+        },
+        {
+          "name": "Speedometer (as on dash)",
+          "role": "speed_shown",
+          "byte": 0,
+          "bits": 13,
+          "shift": 5,
+          "scale": 0.0398066,
+          "offset": 0.3,
+          "unit": "mph",
+          "min": 0,
+          "max": 140,
+          "confidence": "likely",
+          "note": "Same field x1.025 + 0.3 mph: an earlier cluster calibration. Matches the SPEED xx MPH markers within ~1 mph."
+        }
+      ]
+    },
+    {
+      "id": "2EF",
+      "name": "Transmission",
+      "period_ms": 1000,
+      "signals": [
+        {
+          "name": "Engaged gear",
+          "role": "gear",
+          "byte": 0,
+          "bits": 4,
+          "shift": 4,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 15,
+          "confidence": "confirmed",
+          "values": {
+            "0": "N",
+            "1": "1",
+            "2": "2",
+            "3": "3",
+            "4": "4",
+            "5": "5",
+            "6": "6",
+            "7": "R",
+            "8": "7",
+            "9": "8",
+            "10": "8",
+            "15": "P"
+          },
+          "note": "ZF 8HP. Checked with RPM/mph per code across all drives: 3=89, 4=72, 5=55, 6=42, 8=34 (7th), 9=27 (8th) - matches the 8HP ratios. GEAR 3-6 markers match."
+        },
+        {
+          "name": "Target gear",
+          "byte": 0,
+          "bits": 4,
+          "shift": 0,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 15,
+          "confidence": "guess",
+          "values": {
+            "0": "N",
+            "1": "1",
+            "2": "2",
+            "3": "3",
+            "4": "4",
+            "5": "5",
+            "6": "6",
+            "7": "R",
+            "8": "7",
+            "9": "8",
+            "10": "8",
+            "15": "-"
+          },
+          "note": "Low nibble. Shows the next gear while a shift is prepared (0x34 = in 3rd, going to 4th), F = no shift pending."
+        }
+      ]
+    },
+    {
+      "id": "1F7",
+      "name": "Transmission 2",
+      "period_ms": 20,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Gearbox input (turbine) speed",
+          "role": "turbine",
+          "byte": 4,
+          "bits": 16,
+          "shift": 0,
+          "scale": 0.5,
+          "offset": 0,
+          "unit": "rpm",
+          "min": 0,
+          "max": 7000,
+          "confidence": "likely",
+          "note": "Scale 0.5: with the converter locked in every gear 3-8 it equals engine RPM (ratio 1.00 over all drives). Lower than RPM in Park / pulling away = converter slip."
+        },
+        {
+          "name": "Transmission fluid temp?",
+          "role": "trans_temp",
+          "byte": 2,
+          "bits": 6,
+          "shift": 3,
+          "scale": 1,
+          "offset": 0,
+          "unit": "C",
+          "min": 0,
+          "max": 63,
+          "confidence": "guess",
+          "note": "BACCAble formula ((b2&1)<<5 | b3>>3). Only moves 28->33 while coolant goes 64->100, so the scale/offset is probably wrong."
+        }
+      ]
+    },
+    {
+      "id": "2ED",
+      "name": "Engine temps / load",
+      "period_ms": 100,
+      "signals": [
+        {
+          "name": "Coolant temp",
+          "role": "coolant",
+          "byte": 0,
+          "bits": 8,
+          "shift": 0,
+          "scale": 1,
+          "offset": -40,
+          "unit": "C",
+          "min": -40,
+          "max": 130,
+          "gauge": true,
+          "confidence": "confirmed",
+          "note": "b0 - 40. Cold start 64 C -> 100 C after the warm-up drive; 'operating temp' marker at ~90+."
+        },
+        {
+          "name": "Engine load (2ED)",
+          "byte": 5,
+          "bits": 8,
+          "shift": 0,
+          "scale": 0.392157,
+          "offset": 0,
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "confidence": "likely",
+          "note": "~5% idle, 0 on lift-off (fuel cut), 50-80% on throttle stabs. Not pedal position."
+        }
+      ]
+    },
+    {
+      "id": "412",
+      "name": "Engine load",
+      "period_ms": 100,
+      "signals": [
+        {
+          "name": "Engine load",
+          "role": "throttle",
+          "byte": 0,
+          "bits": 8,
+          "shift": 0,
+          "scale": 0.392157,
+          "offset": 0,
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "confidence": "confirmed",
+          "note": "Same as OBD PID 04 (calculated load): r = 0.998, scale 100/255. Found 2026-11-16 with canscope obdref while revving."
+        }
+      ]
+    },
+    {
+      "id": "4B2",
+      "name": "Engine oil",
+      "period_ms": 1000,
+      "signals": [
+        {
+          "name": "Oil temp",
+          "role": "oil_temp",
+          "byte": 2,
+          "bits": 8,
+          "shift": 6,
+          "scale": 1,
+          "offset": -40,
+          "unit": "C",
+          "min": -40,
+          "max": 150,
+          "confidence": "likely",
+          "note": "((b2&0x3F)<<2 | b3>>6) - 40. Rises 57 -> 93 C during manual_drive, lagging coolant as oil should."
+        }
+      ]
+    },
+    {
+      "id": "384",
+      "name": "Ambient",
+      "period_ms": 1000,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Outside temp",
+          "role": "outside_temp",
+          "byte": 1,
+          "bits": 9,
+          "shift": 1,
+          "scale": 1,
+          "offset": -142,
+          "unit": "F",
+          "min": -40,
+          "max": 130,
+          "confidence": "confirmed",
+          "note": "((b1&3)<<7 | b2>>1) - 142. Reads 67-68 F in the temps session (markers: 68 OUTSIDE, 67 OUTSIDE)."
+        }
+      ]
+    },
+    {
+      "id": "0FA",
+      "name": "Brakes / body",
+      "period_ms": 10,
+      "protection": {
+        "crc_byte": 7
+      },
+      "signals": [
+        {
+          "name": "Brake pedal",
+          "byte": 0,
+          "bits": 2,
+          "shift": 2,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 3,
+          "confidence": "confirmed",
+          "values": {
+            "0": "released",
+            "3": "pressed",
+            "1": "?",
+            "2": "?"
+          },
+          "note": "b0 0x80 = released, 0x8C = pressed (BRAKE ON marker). b0 bit 7 drops to 0 (0x20) when the car is off."
+        }
+      ]
+    },
+    {
+      "id": "256",
+      "name": "Parking brake (EPB)",
+      "period_ms": 1000,
+      "signals": [
+        {
+          "name": "Parking brake",
+          "byte": 0,
+          "bits": 1,
+          "shift": 3,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 1,
+          "confidence": "likely",
+          "values": {
+            "0": "off",
+            "1": "ON"
+          },
+          "note": "b0 bit 3. b0 0x28 = applied, 0x20 = released (engine on), 0x08 = applied with car off. Matches the E-BRAKE ENGAGE/RELEASE markers in 3 sessions (allow ~2 s for the motor)."
+        }
+      ]
+    },
+    {
+      "id": "0EE",
+      "name": "Wheel motion",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "note": "b0-b5 all zero = standing still.",
+      "signals": []
+    },
+    {
+      "id": "5A6",
+      "name": "Climate control",
+      "period_ms": 1000,
+      "note": "Found 2026-11-16 in the temps/HVAC session. Changes exactly with the HVAC and fan markers. Setpoint itself not found yet (probably on the body bus, not OBD).",
+      "signals": [
+        {
+          "name": "Climate: manual fan (AUTO off)",
+          "byte": 0,
+          "bits": 1,
+          "shift": 7,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 1,
+          "confidence": "guess",
+          "values": {
+            "0": "AUTO",
+            "1": "manual"
+          },
+          "note": "Flips to 1 exactly when the fan was set by hand ('will exit the AUTO function' marker)."
+        },
+        {
+          "name": "Climate: blower command",
+          "byte": 3,
+          "bits": 8,
+          "shift": 0,
+          "scale": 1,
+          "offset": 0,
+          "unit": "raw",
+          "min": 0,
+          "max": 255,
+          "confidence": "guess",
+          "note": "Inverse of fan speed in manual mode: 0xB1 lowest notch ... 0x16 full speed. Off = 0x3C."
+        },
+        {
+          "name": "Climate: mix / outlet target",
+          "byte": 4,
+          "bits": 10,
+          "shift": 6,
+          "scale": 1,
+          "offset": 0,
+          "unit": "raw",
+          "min": 0,
+          "max": 1023,
+          "confidence": "guess",
+          "note": "Flat while set 61-67 F, then climbs steadily 0x2C -> 0xCC (byte 4) as the setpoint goes 68 -> 84 F."
+        }
+      ]
+    },
+    {
+      "id": "41E",
+      "name": "Unknown 41E",
+      "period_ms": 100,
+      "signals": [
+        {
+          "name": "41E word 0 (rises after engine start)",
+          "byte": 0,
+          "bits": 16,
+          "shift": 0,
+          "scale": 1,
+          "offset": 0,
+          "unit": "raw",
+          "min": 30000,
+          "max": 50000,
+          "confidence": "guess",
+          "note": "Jumps when engine starts, then creeps up slowly. b1/b3 also jump at every window up/down press (motor current), so probably battery voltage/current (IBS)."
+        }
+      ]
+    },
+    {
+      "id": "416",
+      "name": "VIN",
+      "period_ms": 100,
+      "special": "vin_mux",
+      "note": "byte0 = part index 0..2, bytes1-7 = ASCII. Parts 0+1+2 = 17-char VIN.",
+      "signals": []
+    },
+    {
+      "id": "419",
+      "name": "Body (windows / doors)",
+      "period_ms": 100,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "note": "Bursts on window/door events (Driver_door_panel_for_windows session). Siblings 416/41A/41E.",
+      "signals": []
+    },
+    {
+      "id": "192",
+      "name": "Warnings / faults",
+      "period_ms": 100,
+      "note": "b3-b4 count up while cluster warnings are active.",
+      "signals": []
+    },
+    {
+      "id": "0FB",
+      "name": "Turbo / AWD",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "note": "Boost sensor itself is UDS 18DA10F1 22 195A (mbar absolute, ~baro at idle). Broadcast boost not proven yet.",
+      "signals": [
+        {
+          "name": "Boost target? (absolute)",
+          "byte": 2,
+          "bits": 12,
+          "shift": 3,
+          "scale": 1,
+          "offset": 0,
+          "unit": "mbar",
+          "min": 800,
+          "max": 2600,
+          "confidence": "guess",
+          "note": "12-bit field b2-b3 (the old 'b3 x0.1 psi' was its tail). Reads 950-1175 while revving in Park; best match to boost once RPM is taken out (UDS 195A read 969-1052). Probably the boost the engine asks for. Confirm on a drive with full-throttle pulls."
+        }
+      ]
+    },
+    {
+      "id": "0DE",
+      "name": "Unknown 0DE",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 4,
+        "crc_byte": 5
+      },
+      "signals": []
+    },
+    {
+      "id": "100",
+      "name": "Wheel speeds?",
+      "period_ms": 10,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "note": "b0-b3 very dynamic when rolling; not vehicle speed (use 101).",
+      "signals": []
+    },
+    {
+      "id": "0FE",
+      "name": "Stability / steering?",
+      "period_ms": 20,
+      "protection": {
+        "counter_byte": 6,
+        "crc_byte": 7
+      },
+      "note": "b2-b3 steering angle candidate - record full-lock turns with marks to confirm.",
+      "signals": []
+    },
+    {
+      "id": "1EF",
+      "name": "Unknown 1EF",
+      "period_ms": 20,
+      "protection": {
+        "crc_byte": 7
+      },
+      "signals": []
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+﻿Alfa Romeo Giulia (2017, 2.0T Q4, ZF 8HP) - CAN IDs   (updated 2026-11-16)
+====================================================================================================
+Bus: OBD-II pins 6/14, 500 kbit/s, 11-bit + 29-bit ids
+
+HOW TO READ
+  byte = start byte (0 = first). bits/shift: take that many bits after shifting right. value = raw
+  x scale + offset.
+  CONFIRMED = matches your markers / OBD values. LIKELY = fits but not fully proven. GUESS = a
+  lead only.
+  Most fast messages end with a rolling counter (2nd-last byte, low 4 bits) and a CRC checksum
+  (last byte).
+
+QUICK LIST
+----------------------------------------------------------------------------------------------------
+ID     Message                   Signal                                Unit   Confidence
+0x0DE  Unknown 0DE               (nothing decoded yet)
+0x0EE  Wheel motion              (nothing decoded yet)
+0x0FA  Brakes / body             Brake pedal                                  CONFIRMED
+0x0FB  Turbo / AWD               Boost target? (absolute)              mbar   GUESS
+0x0FC  Engine                    Engine RPM                            rpm    CONFIRMED
+0x0FE  Stability / steering?     (nothing decoded yet)
+0x100  Wheel speeds?             (nothing decoded yet)
+0x101  Vehicle speed             Vehicle speed                         mph    CONFIRMED
+                                 Speedometer (as on dash)              mph    LIKELY
+0x192  Warnings / faults         (nothing decoded yet)
+0x1EF  Unknown 1EF               (nothing decoded yet)
+0x1F7  Transmission 2            Gearbox input (turbine) speed         rpm    LIKELY
+                                 Transmission fluid temp?              C      GUESS
+0x256  Parking brake (EPB)       Parking brake                                LIKELY
+0x2ED  Engine temps / load       Coolant temp                          C      CONFIRMED
+                                 Engine load (2ED)                     %      LIKELY
+0x2EF  Transmission              Engaged gear                                 CONFIRMED
+                                 Target gear                                  GUESS
+0x384  Ambient                   Outside temp                          F      CONFIRMED
+0x412  Engine load               Engine load                           %      CONFIRMED
+0x416  VIN                       VIN (17 characters, 3 parts)          text   CONFIRMED
+0x419  Body (windows / doors)    (nothing decoded yet)
+0x41E  Unknown 41E               41E word 0 (rises after engine start) raw    GUESS
+0x4B2  Engine oil                Oil temp                              C      LIKELY
+0x5A6  Climate control           Climate: manual fan (AUTO off)               GUESS
+                                 Climate: blower command               raw    GUESS
+                                 Climate: mix / outlet target          raw    GUESS
+
+DETAILS
+----------------------------------------------------------------------------------------------------
+
+0x0DE  Unknown 0DE   (every 10 ms, counter byte 4, CRC byte 5)
+
+0x0EE  Wheel motion   (every 10 ms, counter byte 6, CRC byte 7)
+    b0-b5 all zero = standing still.
+
+0x0FA  Brakes / body   (every 10 ms, CRC byte 7)
+  - Brake pedal  [CONFIRMED]
+      where:   byte 0, 2 bits, shift 2
+      value:   raw
+      states:  0=released, 3=pressed, 1=?, 2=?
+      note:    b0 0x80 = released, 0x8C = pressed (BRAKE ON marker). b0 bit 7 drops to 0
+      (0x20) when the car is off.
+
+0x0FB  Turbo / AWD   (every 10 ms, counter byte 6, CRC byte 7)
+    Boost sensor itself is UDS 18DA10F1 22 195A (mbar absolute, ~baro at idle). Broadcast boost
+    not proven yet.
+  - Boost target? (absolute)  [GUESS]
+      where:   byte 2, 12 bits, shift 3
+      value:   raw mbar
+      note:    12-bit field b2-b3 (the old 'b3 x0.1 psi' was its tail). Reads 950-1175 while
+      revving in Park; best match to boost once RPM is taken out (UDS 195A read 969-1052).
+      Probably the boost the engine asks for. Confirm on a drive with full-throttle pulls.
+
+0x0FC  Engine   (every 10 ms, counter byte 6, CRC byte 7)
+  - Engine RPM  [CONFIRMED]
+      where:   byte 0, 14 bits, shift 2
+      value:   raw rpm
+      note:    (b0*256 + (b1&0xFC))/4. Matches the RPM 1000/2000/3000 markers in manual_drive.
+      ~800 idle.
+
+0x0FE  Stability / steering?   (every 20 ms, counter byte 6, CRC byte 7)
+    b2-b3 steering angle candidate - record full-lock turns with marks to confirm.
+
+0x100  Wheel speeds?   (every 10 ms, counter byte 6, CRC byte 7)
+    b0-b3 very dynamic when rolling; not vehicle speed (use 101).
+
+0x101  Vehicle speed   (every 10 ms, counter byte 6, CRC byte 7)
+  - Vehicle speed  [CONFIRMED]
+      where:   byte 0, 13 bits, shift 5
+      value:   raw x 0.0388357 mph
+      note:    13-bit km/h x16 (b0 bits 1-0, b1, b2 bits 7-5). True speed: the cluster shows
+      ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16.
+  - Speedometer (as on dash)  [LIKELY]
+      where:   byte 0, 13 bits, shift 5
+      value:   raw x 0.0398066 + 0.3 mph
+      note:    Same field x1.025 + 0.3 mph: an earlier cluster calibration. Matches the SPEED
+      xx MPH markers within ~1 mph.
+
+0x192  Warnings / faults   (every 100 ms)
+    b3-b4 count up while cluster warnings are active.
+
+0x1EF  Unknown 1EF   (every 20 ms, CRC byte 7)
+
+0x1F7  Transmission 2   (every 20 ms, counter byte 6, CRC byte 7)
+  - Gearbox input (turbine) speed  [LIKELY]
+      where:   byte 4, 16 bits
+      value:   raw x 0.5 rpm
+      note:    Scale 0.5: with the converter locked in every gear 3-8 it equals engine RPM
+      (ratio 1.00 over all drives). Lower than RPM in Park / pulling away = converter slip.
+  - Transmission fluid temp?  [GUESS]
+      where:   byte 2, 6 bits, shift 3
+      value:   raw C
+      note:    BACCAble formula ((b2&1)<<5 | b3>>3). Only moves 28->33 while coolant goes
+      64->100, so the scale/offset is probably wrong.
+
+0x256  Parking brake (EPB)   (every 1000 ms)
+  - Parking brake  [LIKELY]
+      where:   byte 0, 1 bits, shift 3
+      value:   raw
+      states:  0=off, 1=ON
+      note:    b0 bit 3. b0 0x28 = applied, 0x20 = released (engine on), 0x08 = applied with
+      car off. Matches the E-BRAKE ENGAGE/RELEASE markers in 3 sessions (allow ~2 s for the
+      motor).
+
+0x2ED  Engine temps / load   (every 100 ms)
+  - Coolant temp  [CONFIRMED]
+      where:   byte 0, 8 bits
+      value:   raw - 40 C
+      note:    b0 - 40. Cold start 64 C -> 100 C after the warm-up drive; 'operating temp'
+      marker at ~90+.
+  - Engine load (2ED)  [LIKELY]
+      where:   byte 5, 8 bits
+      value:   raw x 0.392157 %
+      note:    ~5% idle, 0 on lift-off (fuel cut), 50-80% on throttle stabs. Not pedal
+      position.
+
+0x2EF  Transmission   (every 1000 ms)
+  - Engaged gear  [CONFIRMED]
+      where:   byte 0, 4 bits, shift 4
+      value:   raw
+      states:  0=N, 1=1, 2=2, 3=3, 4=4, 5=5, 6=6, 7=R, 8=7, 9=8, 10=8, 15=P
+      note:    ZF 8HP. Checked with RPM/mph per code across all drives: 3=89, 4=72, 5=55,
+      6=42, 8=34 (7th), 9=27 (8th) - matches the 8HP ratios. GEAR 3-6 markers match.
+  - Target gear  [GUESS]
+      where:   byte 0, 4 bits
+      value:   raw
+      states:  0=N, 1=1, 2=2, 3=3, 4=4, 5=5, 6=6, 7=R, 8=7, 9=8, 10=8, 15=-
+      note:    Low nibble. Shows the next gear while a shift is prepared (0x34 = in 3rd, going
+      to 4th), F = no shift pending.
+
+0x384  Ambient   (every 1000 ms, counter byte 6, CRC byte 7)
+  - Outside temp  [CONFIRMED]
+      where:   byte 1, 9 bits, shift 1
+      value:   raw - 142 F
+      note:    ((b1&3)<<7 | b2>>1) - 142. Reads 67-68 F in the temps session (markers: 68
+      OUTSIDE, 67 OUTSIDE).
+
+0x412  Engine load   (every 100 ms)
+  - Engine load  [CONFIRMED]
+      where:   byte 0, 8 bits
+      value:   raw x 0.392157 %
+      note:    Same as OBD PID 04 (calculated load): r = 0.998, scale 100/255. Found
+      2026-11-16 with canscope obdref while revving.
+
+0x416  VIN   (every 100 ms)
+    byte0 = part index 0..2, bytes1-7 = ASCII. Parts 0+1+2 = 17-char VIN.
+
+0x419  Body (windows / doors)   (every 100 ms, counter byte 6, CRC byte 7)
+    Bursts on window/door events (Driver_door_panel_for_windows session). Siblings 416/41A/41E.
+
+0x41E  Unknown 41E   (every 100 ms)
+  - 41E word 0 (rises after engine start)  [GUESS]
+      where:   byte 0, 16 bits
+      value:   raw
+      note:    Jumps when engine starts, then creeps up slowly. b1/b3 also jump at every
+      window up/down press (motor current), so probably battery voltage/current (IBS).
+
+0x4B2  Engine oil   (every 1000 ms)
+  - Oil temp  [LIKELY]
+      where:   byte 2, 8 bits, shift 6
+      value:   raw - 40 C
+      note:    ((b2&0x3F)<<2 | b3>>6) - 40. Rises 57 -> 93 C during manual_drive, lagging
+      coolant as oil should.
+
+0x5A6  Climate control   (every 1000 ms)
+    Found 2026-11-16 in the temps/HVAC session. Changes exactly with the HVAC and fan markers.
+    Setpoint itself not found yet (probably on the body bus, not OBD).
+  - Climate: manual fan (AUTO off)  [GUESS]
+      where:   byte 0, 1 bits, shift 7
+      value:   raw
+      states:  0=AUTO, 1=manual
+      note:    Flips to 1 exactly when the fan was set by hand ('will exit the AUTO function'
+      marker).
+  - Climate: blower command  [GUESS]
+      where:   byte 3, 8 bits
+      value:   raw
+      note:    Inverse of fan speed in manual mode: 0xB1 lowest notch ... 0x16 full speed. Off
+      = 0x3C.
+  - Climate: mix / outlet target  [GUESS]
+      where:   byte 4, 10 bits, shift 6
+      value:   raw
+      note:    Flat while set 61-67 F, then climbs steadily 0x2C -> 0xCC (byte 4) as the
+      setpoint goes 68 -> 84 F.
+
+MODULE ADDRESSES (trouble-code scan)
+----------------------------------------------------------------------------------------------------
+  18DA40F1   Body computer (BCM)? - most network / body codes land here
+  18DA60F1   Instrument cluster (IPC)?
+
+Every signal was checked against the recordings in captures/ and the markers written while recording
+(SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values
+across several sessions.
+
+NOT IT (checked and rejected)
+----------------------------------------------------------------------------------------------------
+  - 0FA b4 as speed (body counter, ~6 mph error) - use 101
+  - 100 b2-b3 as speed or coolant (wheel dynamics ticks)
+  - 1F7 b5 as coolant, 104 b7 / 0FA b5 as oil temp, 0FB b1 / 192 as outside temp
+  - 0FC b0 high nibble as engaged gear while moving (RPM mux) - use 2EF
+  - 0DE b4 as throttle (rolling 0-15 counter)
+  - 0FB b3 x0.1 as boost psi (22 psi with engine off; low nibble always 4/C, so not a byte-aligned
+  signal)
