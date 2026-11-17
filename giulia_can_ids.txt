@@ -1,4 +1,4 @@
-﻿Alfa Romeo Giulia (2017, 2.0T Q4, ZF 8HP) - CAN IDs   (updated 2026-11-16)
+﻿Alfa Romeo Giulia (2017, 2.0T Q4, ZF 8HP) - CAN IDs   (updated 2026-11-17)
 ====================================================================================================
 Bus: OBD-II pins 6/14, 500 kbit/s, 11-bit + 29-bit ids
 
@@ -13,10 +13,11 @@ HOW TO READ
 QUICK LIST
 ----------------------------------------------------------------------------------------------------
 ID     Message                   Signal                                Unit   Confidence
-0x0DE  Unknown 0DE               (nothing decoded yet)
+0x0DE  Steering                  Steering angle                        deg    LIKELY
+                                 Steering speed?                       raw    GUESS
 0x0EE  Wheel motion              (nothing decoded yet)
 0x0FA  Brakes / body             Brake pedal                                  CONFIRMED
-0x0FB  Turbo / AWD               Boost target? (absolute)              mbar   GUESS
+0x0FB  Turbo / AWD               (nothing decoded yet)
 0x0FC  Engine                    Engine RPM                            rpm    CONFIRMED
 0x0FE  Stability / steering?     (nothing decoded yet)
 0x100  Wheel speeds?             (nothing decoded yet)
@@ -31,23 +32,41 @@ ID     Message                   Signal                                Unit   Co
                                  Engine load (2ED)                     %      LIKELY
 0x2EF  Transmission              Engaged gear                                 CONFIRMED
                                  Target gear                                  GUESS
+                                 Boost                                 psi    CONFIRMED
 0x384  Ambient                   Outside temp                          F      CONFIRMED
-0x412  Engine load               Engine load                           %      CONFIRMED
+0x412  Engine load / pedal       Engine load                           %      CONFIRMED
+                                 Accelerator pedal                     %      CONFIRMED
 0x416  VIN                       VIN (17 characters, 3 parts)          text   CONFIRMED
+0x417  Intake air                Intake air temp                       C      LIKELY
 0x419  Body (windows / doors)    (nothing decoded yet)
+0x41B  Throttle                  Throttle plate                        %      LIKELY
 0x41E  Unknown 41E               41E word 0 (rises after engine start) raw    GUESS
-0x4B2  Engine oil                Oil temp                              C      LIKELY
+0x4B2  Engine oil                Oil temp                              C      CONFIRMED
 0x5A6  Climate control           Climate: manual fan (AUTO off)               GUESS
                                  Climate: blower command               raw    GUESS
                                  Climate: mix / outlet target          raw    GUESS
+0x73E  Turn signals              Left turn signal                             LIKELY
+                                 Right turn signal                            LIKELY
 
 DETAILS
 ----------------------------------------------------------------------------------------------------
 
-0x0DE  Unknown 0DE   (every 10 ms, counter byte 4, CRC byte 5)
+0x0DE  Steering   (every 10 ms, counter byte 4, CRC byte 5)
+  - Steering angle  [LIKELY]
+      where:   byte 0, 16 bits
+      value:   raw x 0.1 - 720 deg
+      note:    raw 7200 = straight, full left 11244 (+404 deg), full right 3163 (-404 deg):
+      about 2.25 turns lock to lock. Left positive. From one full-lock test, parked,
+      2026-11-17.
+  - Steering speed?  [GUESS]
+      where:   byte 2, 12 bits
+      value:   raw - 2000
+      note:    Low 12 bits of b2-b3 sit at 2000 with the wheel still and move only while it
+      turns.
 
 0x0EE  Wheel motion   (every 10 ms, counter byte 6, CRC byte 7)
-    b0-b5 all zero = standing still.
+    b0-b5 all zero = standing still. b5 follows vehicle speed 1:1 in km/h (r 1.000) - probably a
+    wheel speed.
 
 0x0FA  Brakes / body   (every 10 ms, CRC byte 7)
   - Brake pedal  [CONFIRMED]
@@ -58,14 +77,8 @@ DETAILS
       (0x20) when the car is off.
 
 0x0FB  Turbo / AWD   (every 10 ms, counter byte 6, CRC byte 7)
-    Boost sensor itself is UDS 18DA10F1 22 195A (mbar absolute, ~baro at idle). Broadcast boost
-    not proven yet.
-  - Boost target? (absolute)  [GUESS]
-      where:   byte 2, 12 bits, shift 3
-      value:   raw mbar
-      note:    12-bit field b2-b3 (the old 'b3 x0.1 psi' was its tail). Reads 950-1175 while
-      revving in Park; best match to boost once RPM is taken out (UDS 195A read 969-1052).
-      Probably the boost the engine asks for. Confirm on a drive with full-throttle pulls.
+    AWD / turbo related. The b2-b3 'boost target' lead from revving in Park did not hold up on
+    the drive - real boost is in 0x2EF.
 
 0x0FC  Engine   (every 10 ms, counter byte 6, CRC byte 7)
   - Engine RPM  [CONFIRMED]
@@ -75,7 +88,8 @@ DETAILS
       ~800 idle.
 
 0x0FE  Stability / steering?   (every 20 ms, counter byte 6, CRC byte 7)
-    b2-b3 steering angle candidate - record full-lock turns with marks to confirm.
+    Stability. b3-b4 (12 bits) sit at 0x800 when parked and move only when driving - yaw rate or
+    lateral acceleration candidate.
 
 0x100  Wheel speeds?   (every 10 ms, counter byte 6, CRC byte 7)
     b0-b3 very dynamic when rolling; not vehicle speed (use 101).
@@ -85,7 +99,8 @@ DETAILS
       where:   byte 0, 13 bits, shift 5
       value:   raw x 0.0388357 mph
       note:    13-bit km/h x16 (b0 bits 1-0, b1, b2 bits 7-5). True speed: the cluster shows
-      ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16.
+      ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16. Checked against OBD PID 0D on
+      a drive to 77 mph: median error 0.08 mph.
   - Speedometer (as on dash)  [LIKELY]
       where:   byte 0, 13 bits, shift 5
       value:   raw x 0.0398066 + 0.3 mph
@@ -130,7 +145,7 @@ DETAILS
       note:    ~5% idle, 0 on lift-off (fuel cut), 50-80% on throttle stabs. Not pedal
       position.
 
-0x2EF  Transmission   (every 1000 ms)
+0x2EF  Transmission   (every 50 ms)
   - Engaged gear  [CONFIRMED]
       where:   byte 0, 4 bits, shift 4
       value:   raw
@@ -143,6 +158,12 @@ DETAILS
       states:  0=N, 1=1, 2=2, 3=3, 4=4, 5=5, 6=6, 7=R, 8=7, 9=8, 10=8, 15=-
       note:    Low nibble. Shows the next gear while a shift is prepared (0x34 = in 3rd, going
       to 4th), F = no shift pending.
+  - Boost  [CONFIRMED]
+      where:   byte 3, 9 bits, shift 7
+      value:   raw x 0.217557 psi
+      note:    Gauge boost, 15 mbar per step (b3 + top bit of b4). Matches the boost sensor
+      (UDS 18DA10F1 22 195A minus baro) with r 0.999, median error 5 mbar, up to 26 psi on the
+      2026-11-17 drive. Reads 0 under vacuum.
 
 0x384  Ambient   (every 1000 ms, counter byte 6, CRC byte 7)
   - Outside temp  [CONFIRMED]
@@ -151,18 +172,37 @@ DETAILS
       note:    ((b1&3)<<7 | b2>>1) - 142. Reads 67-68 F in the temps session (markers: 68
       OUTSIDE, 67 OUTSIDE).
 
-0x412  Engine load   (every 100 ms)
+0x412  Engine load / pedal   (every 100 ms)
   - Engine load  [CONFIRMED]
       where:   byte 0, 8 bits
       value:   raw x 0.392157 %
       note:    Same as OBD PID 04 (calculated load): r = 0.998, scale 100/255. Found
       2026-11-16 with canscope obdref while revving.
+  - Accelerator pedal  [CONFIRMED]
+      where:   byte 3, 8 bits
+      value:   raw x 0.392157 %
+      note:    Same as OBD PID 49 (pedal sensor D), r 0.999. ~20% = released, ~84% = floored,
+      ~90% = pushed through the kickdown switch.
 
 0x416  VIN   (every 100 ms)
     byte0 = part index 0..2, bytes1-7 = ASCII. Parts 0+1+2 = 17-char VIN.
 
+0x417  Intake air   (every 1000 ms)
+  - Intake air temp  [LIKELY]
+      where:   byte 2, 11 bits, shift 5
+      value:   raw - 40 C
+      note:    Equals the engine computer's intake air value (UDS 22 1935) one-to-one, r
+      0.998. The -40 offset is the usual formula for that value (read 30-41 C on a 10 C
+      night).
+
 0x419  Body (windows / doors)   (every 100 ms, counter byte 6, CRC byte 7)
     Bursts on window/door events (Driver_door_panel_for_windows session). Siblings 416/41A/41E.
+
+0x41B  Throttle   (every 100 ms)
+  - Throttle plate  [LIKELY]
+      where:   byte 4, 16 bits
+      value:   raw x 0.03754 + 10.58 %
+      note:    Follows OBD PID 11 (absolute throttle position, ~11% closed) with r 0.991.
 
 0x41E  Unknown 41E   (every 100 ms)
   - 41E word 0 (rises after engine start)  [GUESS]
@@ -172,11 +212,12 @@ DETAILS
       window up/down press (motor current), so probably battery voltage/current (IBS).
 
 0x4B2  Engine oil   (every 1000 ms)
-  - Oil temp  [LIKELY]
+  - Oil temp  [CONFIRMED]
       where:   byte 2, 8 bits, shift 6
       value:   raw - 40 C
       note:    ((b2&0x3F)<<2 | b3>>6) - 40. Rises 57 -> 93 C during manual_drive, lagging
-      coolant as oil should.
+      coolant as oil should. Matches the engine computer's oil temp (UDS 22 1302) within ~2 C
+      on the 2026-11-17 drive (0x4B2 is sent ~1/s, so it lags).
 
 0x5A6  Climate control   (every 1000 ms)
     Found 2026-11-16 in the temps/HVAC session. Changes exactly with the HVAC and fan markers.
@@ -198,14 +239,32 @@ DETAILS
       note:    Flat while set 61-67 F, then climbs steadily 0x2C -> 0xCC (byte 4) as the
       setpoint goes 68 -> 84 F.
 
+0x73E  Turn signals   (every 100 ms)
+  - Left turn signal  [LIKELY]
+      where:   byte 1, 1 bits, shift 7
+      value:   raw
+      states:  0=off, 1=on
+      note:    Blinks with the left signal. It blinked twice as fast (0.17 s) because the
+      front-left bulb was out - bulb-out hyper-flash.
+  - Right turn signal  [LIKELY]
+      where:   byte 2, 1 bits, shift 5
+      value:   raw
+      states:  0=off, 1=on
+      note:    Blinks with the right signal (0.34 s, normal rate).
+
 MODULE ADDRESSES (trouble-code scan)
 ----------------------------------------------------------------------------------------------------
   18DA40F1   Body computer (BCM)? - most network / body codes land here
   18DA60F1   Instrument cluster (IPC)?
 
 I checked every signal against the recordings in captures/ and the markers I wrote while recording
-(SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values
-across several sessions.
+(SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...), and since 2026-11-17 against values I asked the
+engine computer for while driving. 'confirmed' = matches markers or OBD values across several
+sessions.
+
+2026-11-17 drive (boost, pedal, speed to 77 mph, steering, turn signals): all frames captured, OBD
+PIDs + UDS DIDs 195A/192D/1935/1302 asked ~20x/s for reference. UDS 22 192D = gear as a plain
+number.
 
 NOT IT (checked and rejected)
 ----------------------------------------------------------------------------------------------------
@@ -216,3 +275,4 @@ NOT IT (checked and rejected)
   - 0DE b4 as throttle (rolling 0-15 counter)
   - 0FB b3 x0.1 as boost psi (22 psi with engine off; low nibble always 4/C, so not a byte-aligned
   signal)
+  - 0FB b2-b3 as boost (revving-only lead; on a drive 0x2EF b3 matches the boost sensor, r 0.999)

@@ -10,7 +10,7 @@ They open in SavvyCAN, python-can (`can.LogReader`), cantools, `canplayer`, or w
 * **`old_firmware/`**: I recorded these with an older firmware that dropped about **90 %** of frames. A 100 Hz ID like 0x0FC
   arrives at ~7 Hz. What did arrive is intact (CRC-8 checks pass), so values are right, just sparse.
 * **`obd_reference/`**: recorded with my current firmware, nothing dropped (~2,500 frames/s). While recording,
-  my PC asked the engine computer for known values about 12 times a second. The requests (`18DB33F1`, `18DA10F1`) and answers
+  my PC asked the engine computer for known values 12-20 times a second. The requests (`18DB33F1`, `18DA10F1`) and answers
   (`18DAF110`) are in the log, which is how broadcast signals get matched to real values.
 * The VIN (ID 0x416) has been replaced with `X` in every file.
 * Times are Unix epoch seconds; the car was in US Central time (UTC-5).
@@ -43,5 +43,6 @@ They open in SavvyCAN, python-can (`can.LogReader`), cantools, `canplayer`, or w
 | `old_firmware/session_20260709_060357_manual_drive.log.gz` | 674 s | 75,162 | 35 | Remote start, cold start, drive in manual mode through gears 1-6 with speed/RPM markers |
 | `old_firmware/session_20260709_214341.log.gz` | 340 s | 37,838 | 11 | Drive in D with speed markers 30-55 mph |
 | `old_firmware/session_20260710_060708_temps.log.gz` | 1,622 s | 179,401 | 65 | Warm idle in Park: outside temp, coolant, fuel; HVAC setpoint 61-84 F step by step; fan speed steps |
-| `obd_reference/idle_boost_reference_test.log.gz` | 30 s | 74,819 |  | 30 s idle while polling MAP, baro, RPM, throttle, load and boost (UDS 195A). No frames lost. |
-| `obd_reference/idle_then_revving_boost_reference.log.gz` | 615 s | 1,511,807 |  | ~10 min idle, then revving to ~3400 rpm in Park, polling the same values. No frames lost. |
+| `obd_reference/idle_boost_reference_test.log.gz` | 30 s | 74,817 |  | 30 s idle while polling MAP, baro, RPM, throttle, load and boost (UDS 195A). No frames lost. |
+| `obd_reference/idle_then_revving_boost_reference.log.gz` | 615 s | 1,511,788 |  | ~10 min idle, then revving to ~3400 rpm in Park, polling the same values. No frames lost. |
+| `obd_reference/drive_boost_pulls_to_77mph.log.gz` | 904 s | 2,226,833 |  | 15 min drive: parked turn signals L/R (front-left bulb out) and full-lock steering, then full-throttle pulls (manual and D, kickdown), 70+ mph cruise. Polling MAP, RPM, speed, throttle, pedal, load, MAF, coolant, fuel, voltage, ambient, baro, timing + UDS boost/gear/intake air/oil. No frames lost. |

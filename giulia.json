@@ -2,12 +2,13 @@
   "vehicle": "Alfa Romeo Giulia (2017, 2.0T Q4, ZF 8HP)",
   "vin_prefix": "ZAR",
   "bus": "OBD-II pins 6/14, 500 kbit/s, 11-bit + 29-bit ids",
-  "updated": "2026-11-16",
+  "updated": "2026-11-17",
   "notes": [
     "Signal extraction: take `bits` bits from the big-endian integer starting at `byte`, after shifting right by `shift`.",
     "value = raw * scale + offset. confidence: confirmed | likely | guess. `values` maps a raw value to a label (states, gears).",
     "Most 10/20 ms messages end with: byte[-2] low nibble = rolling counter (0-15), byte[-1] = CRC-8 SAE J1850 (poly 0x1D, init 0xFF, xorout 0xFF) of all previous bytes.",
-    "I checked every signal against the recordings in captures/ and the markers I wrote while recording (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values across several sessions."
+    "I checked every signal against the recordings in captures/ and the markers I wrote while recording (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...), and since 2026-11-17 against values I asked the engine computer for while driving. 'confirmed' = matches markers or OBD values across several sessions.",
+    "2026-11-17 drive (boost, pedal, speed to 77 mph, steering, turn signals): all frames captured, OBD PIDs + UDS DIDs 195A/192D/1935/1302 asked ~20x/s for reference. UDS 22 192D = gear as a plain number."
   ],
   "cluster": {
     "rpm_max": 7000,
@@ -37,7 +38,8 @@
     "1F7 b5 as coolant, 104 b7 / 0FA b5 as oil temp, 0FB b1 / 192 as outside temp",
     "0FC b0 high nibble as engaged gear while moving (RPM mux) - use 2EF",
     "0DE b4 as throttle (rolling 0-15 counter)",
-    "0FB b3 x0.1 as boost psi (22 psi with engine off; low nibble always 4/C, so not a byte-aligned signal)"
+    "0FB b3 x0.1 as boost psi (22 psi with engine off; low nibble always 4/C, so not a byte-aligned signal)",
+    "0FB b2-b3 as boost (revving-only lead; on a drive 0x2EF b3 matches the boost sensor, r 0.999)"
   ],
   "messages": [
     {
@@ -88,7 +90,7 @@
           "max": 140,
           "gauge": true,
           "confidence": "confirmed",
-          "note": "13-bit km/h x16 (b0 bits 1-0, b1, b2 bits 7-5). True speed: the cluster shows ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16."
+          "note": "13-bit km/h x16 (b0 bits 1-0, b1, b2 bits 7-5). True speed: the cluster shows ~3% more (SPEED 45 MPH marker = 43.7 here). km/h = raw/16. Checked against OBD PID 0D on a drive to 77 mph: median error 0.08 mph."
         },
         {
           "name": "Speedometer (as on dash)",
@@ -109,7 +111,7 @@
     {
       "id": "2EF",
       "name": "Transmission",
-      "period_ms": 1000,
+      "period_ms": 50,
       "signals": [
         {
           "name": "Engaged gear",
@@ -165,6 +167,21 @@
             "15": "-"
           },
           "note": "Low nibble. Shows the next gear while a shift is prepared (0x34 = in 3rd, going to 4th), F = no shift pending."
+        },
+        {
+          "name": "Boost",
+          "role": "boost",
+          "byte": 3,
+          "bits": 9,
+          "shift": 7,
+          "scale": 0.217557,
+          "offset": 0,
+          "unit": "psi",
+          "min": 0,
+          "max": 30,
+          "gauge": false,
+          "confidence": "confirmed",
+          "note": "Gauge boost, 15 mbar per step (b3 + top bit of b4). Matches the boost sensor (UDS 18DA10F1 22 195A minus baro) with r 0.999, median error 5 mbar, up to 26 psi on the 2026-11-17 drive. Reads 0 under vacuum."
         }
       ]
     },
@@ -244,7 +261,7 @@
     },
     {
       "id": "412",
-      "name": "Engine load",
+      "name": "Engine load / pedal",
       "period_ms": 100,
       "signals": [
         {
@@ -260,6 +277,20 @@
           "max": 100,
           "confidence": "confirmed",
           "note": "Same as OBD PID 04 (calculated load): r = 0.998, scale 100/255. Found 2026-11-16 with canscope obdref while revving."
+        },
+        {
+          "name": "Accelerator pedal",
+          "role": "pedal",
+          "byte": 3,
+          "bits": 8,
+          "shift": 0,
+          "scale": 0.392157,
+          "offset": 0,
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "confidence": "confirmed",
+          "note": "Same as OBD PID 49 (pedal sensor D), r 0.999. ~20% = released, ~84% = floored, ~90% = pushed through the kickdown switch."
         }
       ]
     },
@@ -279,8 +310,8 @@
           "unit": "C",
           "min": -40,
           "max": 150,
-          "confidence": "likely",
-          "note": "((b2&0x3F)<<2 | b3>>6) - 40. Rises 57 -> 93 C during manual_drive, lagging coolant as oil should."
+          "confidence": "confirmed",
+          "note": "((b2&0x3F)<<2 | b3>>6) - 40. Rises 57 -> 93 C during manual_drive, lagging coolant as oil should. Matches the engine computer's oil temp (UDS 22 1302) within ~2 C on the 2026-11-17 drive (0x4B2 is sent ~1/s, so it lags)."
         }
       ]
     },
@@ -370,7 +401,7 @@
         "counter_byte": 6,
         "crc_byte": 7
       },
-      "note": "b0-b5 all zero = standing still.",
+      "note": "b0-b5 all zero = standing still. b5 follows vehicle speed 1:1 in km/h (r 1.000) - probably a wheel speed.",
       "signals": []
     },
     {
@@ -478,32 +509,46 @@
         "counter_byte": 6,
         "crc_byte": 7
       },
-      "note": "Boost sensor itself is UDS 18DA10F1 22 195A (mbar absolute, ~baro at idle). Broadcast boost not proven yet.",
-      "signals": [
-        {
-          "name": "Boost target? (absolute)",
-          "byte": 2,
-          "bits": 12,
-          "shift": 3,
-          "scale": 1,
-          "offset": 0,
-          "unit": "mbar",
-          "min": 800,
-          "max": 2600,
-          "confidence": "guess",
-          "note": "12-bit field b2-b3 (the old 'b3 x0.1 psi' was its tail). Reads 950-1175 while revving in Park; best match to boost once RPM is taken out (UDS 195A read 969-1052). Probably the boost the engine asks for. Confirm on a drive with full-throttle pulls."
-        }
-      ]
+      "note": "AWD / turbo related. The b2-b3 'boost target' lead from revving in Park did not hold up on the drive - real boost is in 0x2EF.",
+      "signals": []
     },
     {
       "id": "0DE",
-      "name": "Unknown 0DE",
+      "name": "Steering",
       "period_ms": 10,
       "protection": {
         "counter_byte": 4,
         "crc_byte": 5
       },
-      "signals": []
+      "signals": [
+        {
+          "name": "Steering angle",
+          "role": "steering",
+          "byte": 0,
+          "bits": 16,
+          "shift": 0,
+          "scale": 0.1,
+          "offset": -720,
+          "unit": "deg",
+          "min": -450,
+          "max": 450,
+          "confidence": "likely",
+          "note": "raw 7200 = straight, full left 11244 (+404 deg), full right 3163 (-404 deg): about 2.25 turns lock to lock. Left positive. From one full-lock test, parked, 2026-11-17."
+        },
+        {
+          "name": "Steering speed?",
+          "byte": 2,
+          "bits": 12,
+          "shift": 0,
+          "scale": 1,
+          "offset": -2000,
+          "unit": "raw",
+          "min": -2000,
+          "max": 2000,
+          "confidence": "guess",
+          "note": "Low 12 bits of b2-b3 sit at 2000 with the wheel still and move only while it turns."
+        }
+      ]
     },
     {
       "id": "100",
@@ -524,7 +569,7 @@
         "counter_byte": 6,
         "crc_byte": 7
       },
-      "note": "b2-b3 steering angle candidate - record full-lock turns with marks to confirm.",
+      "note": "Stability. b3-b4 (12 bits) sit at 0x800 when parked and move only when driving - yaw rate or lateral acceleration candidate.",
       "signals": []
     },
     {
@@ -535,6 +580,88 @@
         "crc_byte": 7
       },
       "signals": []
+    },
+    {
+      "id": "417",
+      "name": "Intake air",
+      "period_ms": 1000,
+      "signals": [
+        {
+          "name": "Intake air temp",
+          "role": "intake_temp",
+          "byte": 2,
+          "bits": 11,
+          "shift": 5,
+          "scale": 1,
+          "offset": -40,
+          "unit": "C",
+          "min": -40,
+          "max": 120,
+          "confidence": "likely",
+          "note": "Equals the engine computer's intake air value (UDS 22 1935) one-to-one, r 0.998. The -40 offset is the usual formula for that value (read 30-41 C on a 10 C night)."
+        }
+      ]
+    },
+    {
+      "id": "41B",
+      "name": "Throttle",
+      "period_ms": 100,
+      "signals": [
+        {
+          "name": "Throttle plate",
+          "byte": 4,
+          "bits": 16,
+          "shift": 0,
+          "scale": 0.03754,
+          "offset": 10.58,
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "confidence": "likely",
+          "note": "Follows OBD PID 11 (absolute throttle position, ~11% closed) with r 0.991."
+        }
+      ]
+    },
+    {
+      "id": "73E",
+      "name": "Turn signals",
+      "period_ms": 100,
+      "signals": [
+        {
+          "name": "Left turn signal",
+          "byte": 1,
+          "bits": 1,
+          "shift": 7,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 1,
+          "confidence": "likely",
+          "values": {
+            "0": "off",
+            "1": "on"
+          },
+          "note": "Blinks with the left signal. It blinked twice as fast (0.17 s) because the front-left bulb was out - bulb-out hyper-flash."
+        },
+        {
+          "name": "Right turn signal",
+          "byte": 2,
+          "bits": 1,
+          "shift": 5,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "min": 0,
+          "max": 1,
+          "confidence": "likely",
+          "values": {
+            "0": "off",
+            "1": "on"
+          },
+          "note": "Blinks with the right signal (0.34 s, normal rate)."
+        }
+      ]
     }
   ]
 }
