@@ -7,7 +7,7 @@
     "Signal extraction: take `bits` bits from the big-endian integer starting at `byte`, after shifting right by `shift`.",
     "value = raw * scale + offset. confidence: confirmed | likely | guess. `values` maps a raw value to a label (states, gears).",
     "Most 10/20 ms messages end with: byte[-2] low nibble = rolling counter (0-15), byte[-1] = CRC-8 SAE J1850 (poly 0x1D, init 0xFF, xorout 0xFF) of all previous bytes.",
-    "Every signal was checked against the recordings in captures/ and the markers written while recording (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values across several sessions."
+    "I checked every signal against the recordings in captures/ and the markers I wrote while recording (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values across several sessions."
   ],
   "cluster": {
     "rpm_max": 7000,

@@ -1,18 +1,18 @@
 # Alfa Romeo Giulia CAN IDs
 
 Decoded CAN bus signals for the **Alfa Romeo Giulia (2017, 2.0T, Q4 AWD, ZF 8HP automatic)**, read from the
-**OBD-II port** (pins 6/14, 500 kbit/s), with the recordings they were found in.
+**OBD-II port** (pins 6/14, 500 kbit/s), with the recordings I found them in.
 
-Everything here was worked out by recording the bus while doing one thing at a time (shift, brake, rev, set the
-HVAC...) and writing a marker, then matching bytes to the markers and to values asked from the engine computer
-over OBD-II. Each signal says how sure we are:
+I worked all of this out by recording the bus while doing one thing at a time (shift, brake, rev, set the
+HVAC...) and writing a marker, then matching bytes to the markers and to values I asked the engine computer for
+over OBD-II. Each signal says how sure I am:
 
 * **CONFIRMED**: matches the markers or OBD values across several sessions
 * **LIKELY**: fits well, not fully proven
 * **GUESS**: a lead, needs checking
 
-Other Giulia / Stelvio years and engines probably share most of this (same Giorgio platform), but only the car
-above was tested. **Corrections and new finds are welcome.** Open an issue or a pull request.
+Other Giulia / Stelvio years and engines probably share most of this (same Giorgio platform), but I've only
+tested it on my car above. **Corrections and new finds are welcome.** Open an issue or a pull request.
 
 | File | What |
 |---|---|
@@ -112,9 +112,9 @@ Don't use these, they look right at first but aren't:
 * 0x0DE b4 as throttle (a rolling 0-15 counter).
 * 0x0FB b3 x 0.1 as boost psi (reads 22 psi with the engine off).
 
-## How it was recorded
+## How I recorded it
 
-An ESP32 with a CAN transceiver on the OBD-II port, in **listen-only** mode, logging in `candump -L` format.
+I used an ESP32 with a CAN transceiver on the OBD-II port, in **listen-only** mode, logging in `candump -L` format.
 Any CAN logger that writes candump or SavvyCAN format works the same way.
 To find a signal: record while doing **one** thing, add a marker the moment you do it, and compare the bytes
 before and after. For values the engine computer knows (temperatures, pressures), ask for the OBD PID while

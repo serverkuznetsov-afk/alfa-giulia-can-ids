@@ -7,10 +7,10 @@ All files are `candump -L` text, gzip-compressed (`.log.gz`):
 ```
 They open in SavvyCAN, python-can (`can.LogReader`), cantools, `canplayer`, or with plain `zcat`.
 
-* **`old_firmware/`**: recorded with an older firmware that dropped about **90 %** of frames. A 100 Hz ID like 0x0FC
+* **`old_firmware/`**: I recorded these with an older firmware that dropped about **90 %** of frames. A 100 Hz ID like 0x0FC
   arrives at ~7 Hz. What did arrive is intact (CRC-8 checks pass), so values are right, just sparse.
-* **`obd_reference/`**: recorded with the current firmware, nothing dropped (~2,500 frames/s). While recording,
-  the PC asked the engine computer for known values about 12 times a second. The requests (`18DB33F1`, `18DA10F1`) and answers
+* **`obd_reference/`**: recorded with my current firmware, nothing dropped (~2,500 frames/s). While recording,
+  my PC asked the engine computer for known values about 12 times a second. The requests (`18DB33F1`, `18DA10F1`) and answers
   (`18DAF110`) are in the log, which is how broadcast signals get matched to real values.
 * The VIN (ID 0x416) has been replaced with `X` in every file.
 * Times are Unix epoch seconds; the car was in US Central time (UTC-5).

@@ -203,7 +203,7 @@ MODULE ADDRESSES (trouble-code scan)
   18DA40F1   Body computer (BCM)? - most network / body codes land here
   18DA60F1   Instrument cluster (IPC)?
 
-Every signal was checked against the recordings in captures/ and the markers written while recording
+I checked every signal against the recordings in captures/ and the markers I wrote while recording
 (SPEED xx MPH, GEAR n, RPM xxxx, E-BRAKE ENGAGE...). 'confirmed' = matches markers or OBD values
 across several sessions.
 
