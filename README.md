@@ -52,6 +52,7 @@ tested it on my car above. **Corrections and new finds are welcome.** Open an is
 | 0x417 | **Intake air temp** | b2-b3, 11 bits >> 5 | raw - 40 | °C | LIKELY |
 | 0x41B | **Throttle plate** | b4-b5, 16 bits | raw x 0.03754 + 10.58 | % | LIKELY |
 | 0x384 | Outside temp | b1-b2, 9 bits >> 1 | raw - 142 | °F | CONFIRMED |
+| 0x384 | **DNA drive mode** | b1 bits 3-4 | (b1 >> 3) & 3: 0 = Natural, 1 = Dynamic, 2 = Advanced | | CONFIRMED |
 | 0x0FA | Brake pedal | b0 bits 3-2 | 0 = released, 3 = pressed (b0 0x80 / 0x8C) | | CONFIRMED |
 | 0x107 | **Brake pressure** | b0 | raw (0 foot off, 60-70 holding the car still, ~45-52 in a firm stop) | bar? | GUESS |
 | 0x1FA | Brake pedal travel? | b0 | raw - 16 (16 released, ~36 pressed) | raw | GUESS |
@@ -77,6 +78,12 @@ How the new ones were checked (drive of 2026-11-17, nothing dropped, reference v
   0.34 s), the same bulb-out hyper-flash you see on the dash.
 * **Intake air** equals the engine's own intake-air value (UDS `22 1935`) one-to-one, r = 0.998.
 * **Oil temp** (0x4B2) is within ~2 °C of the engine's oil value (UDS `22 1302`). It's sent about once a second, so it lags.
+
+Found later (at-the-car data-ID scan, engine running, then a short drive):
+
+* **DNA drive mode** (0x384 b1 bits 3-4): recorded while turning the knob through each position; raw b1 reads 1 = Natural, 9 = Dynamic, 17 = Advanced (the mode sits in bits 3-4). A second capture held in Dynamic confirmed the mapping.
+* **Oil pressure** (engine UDS `22 1894`): reads 0 with the engine off and climbs smoothly with rpm (r ~ 0.8) — the signature of real oil pressure. The nearby `1893` (target) and `1891` track it. Values are low on purpose: this engine's variable-displacement oil pump holds pressure down for economy (~1.35 bar / 20 psi idle, ~2.4 bar / 35 psi at 3,300 rpm).
+* **Transmission fluid temp** (transmission UDS `22 1009`): the only data-ID that climbed monotonically over a drive while the others bounced or pegged; ~85 °C at idle (matches coolant via the trans heat-exchanger), ~110 °C worked.
 
 ### Gear (0x2EF b0 high nibble)
 
@@ -112,6 +119,9 @@ Battery voltage (OBD PID 0x42, 13.8-14.4 V on the drive) has no broadcast match 
 | 192D | Gear | plain number (3, 4, 5... 8; 0 when stopped in P/N) |
 | 1935 | Intake air temperature | 1 byte, value - 40 = °C (read 30-41 °C) |
 | 1302 | Oil temperature | 16 bits, °C (read 49-87 °C, matches 0x4B2 within ~2 °C) |
+| 1894 | **Oil pressure** (actual) | 16 bits, **mbar gauge**. ~1,350 (1.35 bar / 20 psi) idle, ~2,400 (2.4 bar / 35 psi) at 3,300 rpm, 0 with the engine off. `1893` = target, `1891` = related |
+
+The **transmission** computer (`18DA18F1`) also answers UDS `22`: **`1009` = transmission fluid temp** (16 bits, °C) — ~85 °C idle (tracks coolant via the trans heat-exchanger), ~110 °C worked.
 
 * Modules that answer UDS TesterPresent (`3E 00`) on `18DAxxF1`:
 

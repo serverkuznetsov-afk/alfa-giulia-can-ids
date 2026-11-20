@@ -345,6 +345,23 @@
           "max": 130,
           "confidence": "confirmed",
           "note": "((b1&3)<<7 | b2>>1) - 142. Reads 67-68 F in the temps session (markers: 68 OUTSIDE, 67 OUTSIDE)."
+        },
+        {
+          "name": "DNA mode",
+          "role": "dna",
+          "byte": 1,
+          "bits": 2,
+          "shift": 3,
+          "scale": 1,
+          "offset": 0,
+          "unit": "",
+          "confidence": "confirmed",
+          "values": {
+            "0": "Natural",
+            "1": "Dynamic",
+            "2": "Advanced"
+          },
+          "note": "DNA drive-mode knob = bits 3-4 of b1, (b1>>3)&3. Confirmed at the car: raw b1 1=N, 9=d, 17=a. Also mirrored in 0x5A8 b4 with a different code order."
         }
       ]
     },

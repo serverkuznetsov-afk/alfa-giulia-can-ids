@@ -36,6 +36,7 @@ ID     Message                   Signal                                Unit   Co
                                  Target gear                                  GUESS
                                  Boost                                 psi    CONFIRMED
 0x384  Ambient                   Outside temp                          F      CONFIRMED
+                                 DNA mode                                     CONFIRMED
 0x412  Engine load / pedal       Engine load                           %      CONFIRMED
                                  Accelerator pedal                     %      CONFIRMED
 0x416  VIN                       VIN (17 characters, 3 parts)          text   CONFIRMED
@@ -188,6 +189,12 @@ DETAILS
       value:   raw - 142 F
       note:    ((b1&3)<<7 | b2>>1) - 142. Reads 67-68 F in the temps session (markers: 68
       OUTSIDE, 67 OUTSIDE).
+  - DNA mode  [CONFIRMED]
+      where:   byte 1, 2 bits, shift 3
+      value:   raw
+      states:  0=Natural, 1=Dynamic, 2=Advanced
+      note:    DNA drive-mode knob = bits 3-4 of b1, (b1>>3)&3. Confirmed at the car: raw b1
+      1=N, 9=d, 17=a. Also mirrored in 0x5A8 b4 with a different code order.
 
 0x412  Engine load / pedal   (every 100 ms)
   - Engine load  [CONFIRMED]
